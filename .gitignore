@@ -1,0 +1,59 @@
+# ==========================================================
+# Task Manager - .gitignore
+# ==========================================================
+
+# ---------- Environment / credentials ----------
+# If you move DB credentials into a .env file instead of hard-coding
+# them in config/database.php, ignore it so secrets never get committed.
+.env
+.env.local
+.env.*.local
+
+# Real database credentials live here locally. Never commit this file —
+# commit config/database.example.php instead, and have each developer
+# copy it to config/database.php and fill in their own values.
+config/database.php
+
+# ---------- OS-generated files ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---------- Editor / IDE ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------- PHP / Composer (if you add dependencies later) ----------
+vendor/
+composer.phar
+composer.lock
+
+# ---------- Logs ----------
+*.log
+error_log
+php_errors.log
+
+# ---------- Local server artifacts ----------
+*.sql.bak
+*.sqlite
+*.sqlite3
+
+# ---------- XAMPP / WAMP local config (if kept inside the project) ----------
+xampp-control.ini
+
+# ---------- Uploaded/user-generated files (if this app later stores them) ----------
+uploads/
+storage/
+
+# ---------- Node (only relevant if you ever add front-end tooling) ----------
+node_modules/
+npm-debug.log*
+yarn-error.log*
