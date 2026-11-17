@@ -79,6 +79,7 @@ require_once __DIR__ . '/includes/header.php';
                     <button type="button" class="password-toggle" data-target="password" aria-label="Show password">&#128065;</button>
                 </div>
             </div>
+            <p class="form-hint"><a href="forgot_password.php">Forgot your password?</a></p>
 
             <button type="submit" class="btn btn--primary btn--block">Log in</button>
         </form>

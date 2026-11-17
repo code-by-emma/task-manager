@@ -35,6 +35,7 @@ $pageTitle = $pageTitle ?? 'Task Manager';
         </a>
         <nav class="app-nav">
             <span class="app-nav__user">Hi, <?= e(currentUserName()) ?></span>
+            <a href="categories.php" class="app-nav__link">Categories</a>
             <a href="profile.php" class="app-nav__link">Profile</a>
             <form action="logout.php" method="post" class="app-nav__logout-form">
                 <?= csrfField() ?>

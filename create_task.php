@@ -15,7 +15,11 @@ $old = [
     'description' => '',
     'priority'    => 'medium',
     'due_date'    => '',
+    'category_id' => '',
 ];
+
+$pdo        = getDB();
+$categories = getUserCategories($pdo, currentUserId());
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCsrf();
@@ -25,7 +29,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $priority    = $_POST['priority'] ?? 'medium';
     $dueDate     = trim($_POST['due_date'] ?? '');
 
-    $old = compact('title', 'description', 'priority', 'due_date');
+    $categoryRaw = $_POST['category_id'] ?? '';
+
+    $old = [
+        'title'       => $title,
+        'description' => $description,
+        'priority'    => $priority,
+        'due_date'    => $dueDate,
+        'category_id' => is_string($categoryRaw) ? $categoryRaw : '',
+    ];
 
     if ($title === '') {
         $errors[] = 'Task title is required.';
@@ -41,6 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please choose a valid priority.';
     }
 
+    // The category (if any) must belong to the logged-in user.
+    [$categoryId, $categoryError] = validateTaskCategory($pdo, $categoryRaw, currentUserId());
+    if ($categoryError) {
+        $errors[] = $categoryError;
+    }
+
     $normalizedDueDate = null;
     if ($dueDate !== '') {
         $d = DateTime::createFromFormat('Y-m-d', $dueDate);
@@ -52,16 +70,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if (empty($errors)) {
-        $pdo = getDB();
         // user_id ALWAYS comes from the session, never from the form.
         $stmt = $pdo->prepare(
-            'INSERT INTO tasks (user_id, title, description, status, priority, due_date, created_at, updated_at)
-             VALUES (:user_id, :title, :description, :status, :priority, :due_date, NOW(), NOW())'
+            'INSERT INTO tasks (user_id, category_id, title, description, status, priority, due_date, created_at, updated_at)
+             VALUES (:user_id, :category_id, :title, :description, :status, :priority, :due_date, NOW(), NOW())'
         );
 
         try {
             $stmt->execute([
                 'user_id'     => currentUserId(),
+                'category_id' => $categoryId,
                 'title'       => $title,
                 'description' => $description !== '' ? $description : null,
                 'status'      => 'pending',
@@ -108,6 +126,17 @@ require_once __DIR__ . '/includes/header.php';
             <label for="description">Description</label>
             <textarea id="description" name="description" rows="5"
                       maxlength="<?= DESCRIPTION_MAX_LENGTH ?>"><?= e($old['description']) ?></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="category_id">Category</label>
+            <select id="category_id" name="category_id">
+                <option value="">Uncategorized</option>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= (int) $cat['id'] ?>" <?= (string) $old['category_id'] === (string) $cat['id'] ? 'selected' : '' ?>><?= e($cat['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <small class="form-hint"><a href="categories.php">Manage categories</a></small>
         </div>
 
         <div class="form-row">

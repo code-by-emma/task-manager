@@ -77,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'password' => $hashedPassword,
             ]);
 
+            // Give the new user a starter set of categories (Work, Personal, ...).
+            seedDefaultCategories($pdo, (int) $pdo->lastInsertId());
+
             setFlash('success', 'Account created successfully. Please log in.');
             header('Location: login.php');
             exit;

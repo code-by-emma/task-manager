@@ -35,18 +35,23 @@ $stats = [
  * ------------------------------------------------------------------- */
 $statusFilter   = $_GET['status'] ?? 'all';
 $priorityFilter = $_GET['priority'] ?? 'all';
+$categoryFilter = $_GET['category'] ?? 'all';
 $search         = trim($_GET['q'] ?? '');
 $sort           = $_GET['sort'] ?? 'newest';
 
 $allowedStatuses   = ['all', 'pending', 'completed'];
 $allowedPriorities = ['all', 'low', 'medium', 'high'];
 $allowedSorts = [
-    'newest'      => 'created_at DESC',
-    'oldest'      => 'created_at ASC',
-    'due_date'    => 'due_date IS NULL, due_date ASC',
-    'priority'    => "FIELD(priority, 'high', 'medium', 'low')",
-    'recently_completed' => 'completed_at IS NULL, completed_at DESC',
+    'newest'      => 't.created_at DESC',
+    'oldest'      => 't.created_at ASC',
+    'due_date'    => 't.due_date IS NULL, t.due_date ASC',
+    'priority'    => "FIELD(t.priority, 'high', 'medium', 'low')",
+    'recently_completed' => 't.completed_at IS NULL, t.completed_at DESC',
 ];
+
+// Categories belonging to this user (for the filter dropdown + validation).
+$categories  = getUserCategories($pdo, $userId);
+$categoryIds = array_map(static fn($c) => (string) $c['id'], $categories);
 
 if (!in_array($statusFilter, $allowedStatuses, true)) {
     $statusFilter = 'all';
@@ -54,25 +59,36 @@ if (!in_array($statusFilter, $allowedStatuses, true)) {
 if (!in_array($priorityFilter, $allowedPriorities, true)) {
     $priorityFilter = 'all';
 }
+// 'all', 'none' (uncategorized), or the id of one of THIS user's categories.
+if (!in_array($categoryFilter, ['all', 'none'], true) && !in_array($categoryFilter, $categoryIds, true)) {
+    $categoryFilter = 'all';
+}
 if (!array_key_exists($sort, $allowedSorts)) {
     $sort = 'newest';
 }
 
-$where  = ['user_id = :user_id'];
+$where  = ['t.user_id = :user_id'];
 $params = ['user_id' => $userId];
 
 if ($statusFilter !== 'all') {
-    $where[] = 'status = :status';
+    $where[] = 't.status = :status';
     $params['status'] = $statusFilter;
 }
 
 if ($priorityFilter !== 'all') {
-    $where[] = 'priority = :priority';
+    $where[] = 't.priority = :priority';
     $params['priority'] = $priorityFilter;
 }
 
+if ($categoryFilter === 'none') {
+    $where[] = 't.category_id IS NULL';
+} elseif ($categoryFilter !== 'all') {
+    $where[] = 't.category_id = :category_id';
+    $params['category_id'] = (int) $categoryFilter;
+}
+
 if ($search !== '') {
-    $where[] = '(title LIKE :search1 OR description LIKE :search2)';
+    $where[] = '(t.title LIKE :search1 OR t.description LIKE :search2)';
     $params['search1'] = '%' . $search . '%';
     $params['search2'] = '%' . $search . '%';
 }
@@ -80,7 +96,11 @@ if ($search !== '') {
 $whereSql = implode(' AND ', $where);
 $orderBySql = $allowedSorts[$sort];
 
-$sql = "SELECT * FROM tasks WHERE $whereSql ORDER BY $orderBySql, id DESC";
+$sql = "SELECT t.*, c.name AS category_name, c.color AS category_color
+        FROM tasks t
+        LEFT JOIN categories c ON c.id = t.category_id
+        WHERE $whereSql
+        ORDER BY $orderBySql, t.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $tasks = $stmt->fetchAll();
@@ -145,6 +165,17 @@ require_once __DIR__ . '/includes/header.php';
             </div>
 
             <div class="filters-form__group">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                    <option value="all" <?= $categoryFilter === 'all' ? 'selected' : '' ?>>All</option>
+                    <option value="none" <?= $categoryFilter === 'none' ? 'selected' : '' ?>>Uncategorized</option>
+                    <?php foreach ($categories as $cat): ?>
+                        <option value="<?= (int) $cat['id'] ?>" <?= $categoryFilter === (string) $cat['id'] ? 'selected' : '' ?>><?= e($cat['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
+            <div class="filters-form__group">
                 <label for="sort">Sort by</label>
                 <select id="sort" name="sort">
                     <option value="newest" <?= $sort === 'newest' ? 'selected' : '' ?>>Newest</option>
@@ -186,6 +217,9 @@ require_once __DIR__ . '/includes/header.php';
                     <div class="task-card__header">
                         <h3 class="task-card__title"><?= e($task['title']) ?></h3>
                         <div class="task-card__badges">
+                            <?php if (!empty($task['category_name'])): ?>
+                                <span class="badge badge-category <?= e(categoryClass($task['category_color'])) ?>"><?= e($task['category_name']) ?></span>
+                            <?php endif; ?>
                             <span class="badge <?= e($priority['class']) ?>"><?= e($priority['label']) ?></span>
                             <span class="badge <?= e($status['class']) ?>"><?= e($status['label']) ?></span>
                         </div>

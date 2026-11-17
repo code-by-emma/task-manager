@@ -37,7 +37,10 @@ $old = [
     'priority'    => $task['priority'],
     'due_date'    => $task['due_date'] ?? '',
     'status'      => $task['status'],
+    'category_id' => $task['category_id'] ?? '',
 ];
+
+$categories = getUserCategories($pdo, $userId);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     requireValidCsrf();
@@ -48,7 +51,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dueDate     = trim($_POST['due_date'] ?? '');
     $status      = $_POST['status'] ?? 'pending';
 
-    $old = compact('title', 'description', 'priority', 'due_date', 'status');
+    $categoryRaw = $_POST['category_id'] ?? '';
+
+    $old = [
+        'title'       => $title,
+        'description' => $description,
+        'priority'    => $priority,
+        'due_date'    => $dueDate,
+        'status'      => $status,
+        'category_id' => is_string($categoryRaw) ? $categoryRaw : '',
+    ];
 
     if ($title === '') {
         $errors[] = 'Task title is required.';
@@ -66,6 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!in_array($status, $allowedStatuses, true)) {
         $errors[] = 'Please choose a valid status.';
+    }
+
+    // The category (if any) must belong to the logged-in user.
+    [$categoryId, $categoryError] = validateTaskCategory($pdo, $categoryRaw, $userId);
+    if ($categoryError) {
+        $errors[] = $categoryError;
     }
 
     $normalizedDueDate = null;
@@ -90,7 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $stmt = $pdo->prepare(
             'UPDATE tasks
-             SET title = :title,
+             SET category_id = :category_id,
+                 title = :title,
                  description = :description,
                  priority = :priority,
                  due_date = :due_date,
@@ -102,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         try {
             $stmt->execute([
+                'category_id'  => $categoryId,
                 'title'        => $title,
                 'description'  => $description !== '' ? $description : null,
                 'priority'     => $priority,
@@ -152,6 +172,17 @@ require_once __DIR__ . '/includes/header.php';
             <label for="description">Description</label>
             <textarea id="description" name="description" rows="5"
                       maxlength="<?= DESCRIPTION_MAX_LENGTH ?>"><?= e($old['description']) ?></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="category_id">Category</label>
+            <select id="category_id" name="category_id">
+                <option value="">Uncategorized</option>
+                <?php foreach ($categories as $cat): ?>
+                    <option value="<?= (int) $cat['id'] ?>" <?= (string) $old['category_id'] === (string) $cat['id'] ? 'selected' : '' ?>><?= e($cat['name']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <small class="form-hint"><a href="categories.php">Manage categories</a></small>
         </div>
 
         <div class="form-row">

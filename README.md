@@ -222,3 +222,74 @@ Manually verify:
 ---
 
 Enjoy using TaskFlow!
+
+
+---
+
+## Task categories
+
+Every task can have one category (Work, Personal, Shopping, ...), shown as a
+colored badge on the dashboard.
+
+- **Defaults:** each new user is given Work, Personal, Shopping, Health and
+  Study when they register.
+- **Manage them:** the **Categories** link in the header lets users add,
+  rename, recolor and delete their own categories. Deleting a category keeps
+  its tasks; they simply become "Uncategorized".
+- **Assign & filter:** pick a category on the create/edit task form, and use the
+  **Category** dropdown in the dashboard filters (including "Uncategorized").
+- **Privacy:** categories belong to a user. The server rejects any category id
+  that isn't owned by the logged-in user.
+
+### Upgrading an existing database
+
+Fresh installs get everything from `database.sql`. If you already have a
+database with tasks in it, run the migration **once** instead of re-importing:
+
+```bash
+mysql -u root -p < migrate_add_categories.sql
+```
+
+It adds the `categories` table and `tasks.category_id`, and gives every
+existing user the default categories. Existing tasks stay uncategorized until
+the user assigns one.
+
+
+---
+
+## Forgot password
+
+The login page has a **Forgot your password?** link.
+
+1. The user enters their email on `forgot_password.php`.
+2. If an account exists, an email with a one-time link to `reset_password.php`
+   is sent. The page says the same thing whether or not the email is
+   registered, so it can't be used to find out who has an account.
+3. The link works once and expires after 60 minutes. Requesting a new link
+   cancels any older one, and repeat requests within 60 seconds are ignored.
+4. After choosing a new password (8+ characters), the user is sent to log in.
+
+Only a SHA-256 hash of each token is stored in the database.
+
+### Setting up email
+
+Settings are in `config/mail.php`:
+
+| Setting      | What it does |
+|--------------|--------------|
+| `driver`     | `'log'` (default) sends nothing and writes the email, including the reset link, to the **PHP error log** — handy locally. Set to `'mail'` in production to send with PHP's `mail()`. |
+| `base_url`   | Public URL of the app with no trailing slash, e.g. `https://tasks.example.com`. Reset links are built from this. **Set it correctly** or links will point to the wrong place. |
+| `from_email` | Sender address. Use one on your own domain, or messages are likely to land in spam. |
+
+`mail()` needs a working mail setup on the server (sendmail/postfix or your
+host's mail service). If emails don't arrive, or you'd rather use a provider
+like Mailgun, SendGrid or Gmail SMTP, the only function to change is
+`sendMail()` in `includes/mail.php`.
+
+### Upgrading an existing database
+
+Run once (safe to repeat):
+
+```bash
+mysql -u root -p < migrate_add_password_resets.sql
+```
